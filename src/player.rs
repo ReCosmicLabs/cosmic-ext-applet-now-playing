@@ -57,6 +57,18 @@ pub fn find_selected_or_active_from_players(players: Vec<mpris::Player>) -> Opti
             *selected = None;
         }
     }
+    // A dedicated music player wins over whatever a browser tab happens to expose.
+    let mut players = players;
+    players.sort_by_key(player_rank);
+    if let Some(player) = players.iter().position(|player| {
+        player_rank(player) == 0
+            && player
+                .get_metadata()
+                .map(|metadata| !metadata.is_empty())
+                .unwrap_or(false)
+    }) {
+        return players.into_iter().nth(player);
+    }
     let mut first_paused = None;
     let mut first_with_track = None;
     let mut first_found = None;
@@ -77,6 +89,34 @@ pub fn find_selected_or_active_from_players(players: Vec<mpris::Player>) -> Opti
         }
     }
     first_paused.or(first_with_track).or(first_found)
+}
+
+const PREFERRED_PLAYERS: &[&str] = &["spotify"];
+const DEMOTED_PLAYERS: &[&str] = &["chromium", "chrome", "firefox", "brave", "vivaldi"];
+
+/// 0 = preferred music player, 1 = anything else, 2 = a browser.
+fn player_rank(player: &mpris::Player) -> u8 {
+    let bus = player.bus_name().to_ascii_lowercase();
+    if PREFERRED_PLAYERS.iter().any(|p| bus.contains(p)) {
+        0
+    } else if DEMOTED_PLAYERS.iter().any(|p| bus.contains(p)) {
+        2
+    } else {
+        1
+    }
+}
+
+pub fn player_icon_name(bus_name: &str) -> &'static str {
+    let bus = bus_name.to_ascii_lowercase();
+    if bus.contains("spotify") {
+        "spotify-launcher"
+    } else if bus.contains("chromium") || bus.contains("chrome") {
+        "google-chrome"
+    } else if bus.contains("firefox") {
+        "firefox"
+    } else {
+        "audio-x-generic-symbolic"
+    }
 }
 
 pub fn playback_state_from_player(player: &mpris::Player) -> PlaybackState {

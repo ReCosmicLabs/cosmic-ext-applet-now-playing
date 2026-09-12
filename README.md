@@ -1,3 +1,28 @@
+# cosmic-ext-applet-now-playing (fork)
+
+> **This is a fork of [AdityaHebballe/cosmic-ext-applet-now-playing](https://github.com/AdityaHebballe/cosmic-ext-applet-now-playing)**,
+> an MPRIS now-playing applet for the COSMIC panel. All credit for the applet goes to the original author.
+> The license is unchanged: **GPL-3.0-only** (see `LICENSE`).
+
+## Changes in this fork
+
+Maintained by [eualexandrerrr](https://github.com/eualexandrerrr) for the
+[dotfiles](https://github.com/eualexandrerrr/dotfiles) setup. Everything below is a modification of the
+original work, as required by section 5 of the GPL.
+
+- **Player preference** (`src/player.rs`). A dedicated music player (Spotify) is picked whenever it has a
+  track loaded, even if paused; browsers (Chromium, Chrome, Firefox, Brave, Vivaldi) are only used when
+  nothing else is available. Upstream follows MPRIS' "whoever is playing" rule, which made a WhatsApp tab
+  take over the panel.
+- **Compact panel card** (`src/window.rs`). The panel shows the player's icon, a square cover, title and
+  artist on two small lines (11 px / 9.5 px) and 14 px transport buttons, instead of one large text line.
+
+The popup is unchanged.
+
+---
+
+Original README follows.
+
 # cosmic-ext-applet-now-playing
 
 A small COSMIC panel applet that shows what is currently playing via MPRIS.

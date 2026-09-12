@@ -15,7 +15,9 @@ use mpris::LoopStatus;
 
 use crate::coordinator;
 use crate::metadata::{now_playing_from_player_with_sources, now_playing_snapshot, NowPlayingData};
-use crate::player::{cycle_loop_status, select_player, toggle_shuffle, with_player};
+use crate::player::{
+    cycle_loop_status, player_icon_name, select_player, toggle_shuffle, with_player,
+};
 
 const ID: &str = "com.github.DiegoMMR.CosmicExtAppletNowPlaying";
 
@@ -243,7 +245,6 @@ impl cosmic::Application for Window {
             return self.core.applet.autosize_window(text("")).into();
         }
 
-        let size = self.core.applet.suggested_size(true);
         let pad = self.core.applet.suggested_padding(true);
         let transport_icon = match self.playback_state {
             PlaybackState::Playing => "media-playback-pause-symbolic",
@@ -252,96 +253,104 @@ impl cosmic::Application for Window {
             }
         };
 
-        const PANEL_TRANSPORT_SIZE: f32 = 28.0;
-        let panel_previous =
-            container(icon::from_name("media-skip-backward-symbolic").size(size.0))
+        // Compact card: player icon, cover, two small text lines, then the transport.
+        const PANEL_TRANSPORT_SIZE: f32 = 22.0;
+        const PANEL_TRANSPORT_ICON: u16 = 14;
+        const PANEL_PLAYER_ICON: u16 = 16;
+        const PANEL_ART_SIZE: f32 = 26.0;
+        const PANEL_TEXT_WIDTH: f32 = 150.0;
+        const PANEL_TITLE_SIZE: f32 = 11.0;
+        const PANEL_ARTIST_SIZE: f32 = 9.5;
+        let transport = |name: &'static str| {
+            container(icon::from_name(name).size(PANEL_TRANSPORT_ICON))
                 .width(Length::Fixed(PANEL_TRANSPORT_SIZE))
                 .height(Length::Fixed(PANEL_TRANSPORT_SIZE))
                 .align_x(cosmic::iced::alignment::Horizontal::Center)
-                .align_y(cosmic::iced::alignment::Vertical::Center);
+                .align_y(cosmic::iced::alignment::Vertical::Center)
+        };
         let panel_previous: Element<'_, Message> = if self.can_go_previous {
-            mouse_area(panel_previous)
+            mouse_area(transport("media-skip-backward-symbolic"))
                 .on_press(Message::PreviousTrack)
                 .into()
         } else {
-            panel_previous.into()
+            transport("media-skip-backward-symbolic").into()
         };
-        let panel_play = container(icon::from_name(transport_icon).size(size.0))
-            .width(Length::Fixed(PANEL_TRANSPORT_SIZE))
-            .height(Length::Fixed(PANEL_TRANSPORT_SIZE))
-            .align_x(cosmic::iced::alignment::Horizontal::Center)
-            .align_y(cosmic::iced::alignment::Vertical::Center);
-        let panel_play: Element<'_, Message> = mouse_area(panel_play)
+        let panel_play: Element<'_, Message> = mouse_area(transport(transport_icon))
             .on_press(Message::TogglePlayPause)
             .into();
-        let panel_next = container(icon::from_name("media-skip-forward-symbolic").size(size.0))
-            .width(Length::Fixed(PANEL_TRANSPORT_SIZE))
-            .height(Length::Fixed(PANEL_TRANSPORT_SIZE))
-            .align_x(cosmic::iced::alignment::Horizontal::Center)
-            .align_y(cosmic::iced::alignment::Vertical::Center);
         let panel_next: Element<'_, Message> = if self.can_go_next {
-            mouse_area(panel_next).on_press(Message::NextTrack).into()
+            mouse_area(transport("media-skip-forward-symbolic"))
+                .on_press(Message::NextTrack)
+                .into()
         } else {
-            panel_next.into()
+            transport("media-skip-forward-symbolic").into()
         };
-        // Keep a fixed slot so the title never shifts when remote cover art
-        // finishes downloading. The image handle points at the existing local
-        // artwork cache; no extra network request or decode path is created.
-        const PANEL_ART_SIZE: f32 = 24.0;
-        const PANEL_ART_GAP: f32 = 14.0;
-        const PANEL_ART_MAX_WIDTH: f32 = 44.0;
-        let panel_art_width = self
-            .album_art_dimensions
-            .and_then(|(width, height)| {
-                (height != 0).then(|| {
-                    (PANEL_ART_SIZE * width as f32 / height as f32).clamp(1.0, PANEL_ART_MAX_WIDTH)
-                })
-            })
-            .unwrap_or(PANEL_ART_SIZE);
+        let player_icon = container(
+            icon::from_name(player_icon_name(&self.player_bus_name)).size(PANEL_PLAYER_ICON),
+        )
+        .width(Length::Fixed(PANEL_PLAYER_ICON as f32))
+        .height(Length::Fixed(PANEL_PLAYER_ICON as f32))
+        .align_x(cosmic::iced::alignment::Horizontal::Center)
+        .align_y(cosmic::iced::alignment::Vertical::Center);
         let panel_art: Element<'_, Message> = if let Some(path) = self.album_art_path.as_ref() {
-            // Preserve the source aspect ratio in the panel. The row reserves
-            // this exact width, so the title gap begins at the visible image
-            // edge for both square covers and wide video thumbnails.
             container(
                 image(image::Handle::from_path(path.clone()))
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .content_fit(ContentFit::Contain)
-                    .border_radius(4.0),
+                    .content_fit(ContentFit::Cover)
+                    .border_radius(5.0),
             )
-            .width(Length::Fixed(panel_art_width))
+            .width(Length::Fixed(PANEL_ART_SIZE))
             .height(Length::Fixed(PANEL_ART_SIZE))
             .clip(true)
             .into()
         } else {
             Space::new()
-                .width(Length::Fixed(panel_art_width))
+                .width(Length::Fixed(PANEL_ART_SIZE))
                 .height(Length::Fixed(PANEL_ART_SIZE))
                 .into()
         };
+        let artist_line = if self.now_playing_artist.is_empty() {
+            self.now_playing_album.as_str()
+        } else {
+            self.now_playing_artist.as_str()
+        };
+        let lines = Column::new()
+            .spacing(0)
+            .width(Length::Fixed(PANEL_TEXT_WIDTH))
+            .push(
+                text(self.now_playing_title.as_str())
+                    .size(PANEL_TITLE_SIZE)
+                    .width(Length::Fixed(PANEL_TEXT_WIDTH))
+                    .wrapping(Wrapping::None)
+                    .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1))),
+            )
+            .push(
+                text(artist_line)
+                    .size(PANEL_ARTIST_SIZE)
+                    .width(Length::Fixed(PANEL_TEXT_WIDTH))
+                    .wrapping(Wrapping::None)
+                    .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
+                    .class(cosmic::theme::Text::Default),
+            );
         let panel_content = Row::new()
-            .spacing(pad.0)
+            .spacing(8)
             .align_y(cosmic::iced::alignment::Vertical::Center)
-            .push(panel_previous)
-            .push(panel_play)
-            .push(panel_next)
+            .push(player_icon)
+            .push(panel_art)
+            .push(lines)
             .push(
                 Row::new()
-                    .spacing(PANEL_ART_GAP)
+                    .spacing(2)
                     .align_y(cosmic::iced::alignment::Vertical::Center)
-                    .push(panel_art)
-                    .push(
-                        text(self.now_playing_text.as_str())
-                            .size(size.0.saturating_sub(1))
-                            .width(Length::Fixed(200.0))
-                            .wrapping(Wrapping::None)
-                            .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1))),
-                    ),
+                    .push(panel_previous)
+                    .push(panel_play)
+                    .push(panel_next),
             );
         let panel_card = button::custom(panel_content)
             // A single applet button provides one shared hover surface; the
             // mouse areas above capture transport clicks before this popup action.
-            .padding([4, 6, 4, 8])
+            .padding([2, 6, 2, 6])
             .class(cosmic::theme::Button::AppletIcon)
             .on_press_with_rectangle(|offset, bounds| Message::TogglePopup {
                 anchor_x: (bounds.x - offset.x).round() as i32,
