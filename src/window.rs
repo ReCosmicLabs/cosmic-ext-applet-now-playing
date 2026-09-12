@@ -242,7 +242,12 @@ impl cosmic::Application for Window {
 
     fn view(&self) -> Element<'_, Message> {
         if !self.has_active_media() {
-            return self.core.applet.autosize_window(text("")).into();
+            // Zero-sized on purpose: the panel then draws no pill for this applet.
+            return self
+                .core
+                .applet
+                .autosize_window(Space::new().width(Length::Fixed(0.0)).height(Length::Fixed(0.0)))
+                .into();
         }
 
         let pad = self.core.applet.suggested_padding(true);
