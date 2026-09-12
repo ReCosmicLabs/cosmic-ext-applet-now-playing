@@ -38,6 +38,7 @@ pub struct Window {
     can_go_next: bool,
     can_shuffle: bool,
     shuffle: bool,
+    volume: Option<u32>,
     can_loop: bool,
     loop_status: Option<LoopStatus>,
     playback_state: PlaybackState,
@@ -73,6 +74,7 @@ pub enum Message {
     CycleLoop,
     Seek(i64),
     SeekTo(u64),
+    SetVolume(u32),
 }
 
 impl cosmic::Application for Window {
@@ -223,6 +225,14 @@ impl cosmic::Application for Window {
                 let _ = with_player(&self.player_bus_name, |player| {
                     let _ = player.seek(offset);
                 });
+            }
+            Message::SetVolume(pct) => {
+                self.volume = Some(pct);
+                let bus = self.player_bus_name.clone();
+                with_player(&bus, |player| {
+                    let _ = player.set_volume(f64::from(pct) / 100.0);
+                });
+                coordinator::request_refresh();
             }
             Message::SeekTo(seconds) => {
                 let current = self.position_seconds.unwrap_or(0);
@@ -594,6 +604,31 @@ impl cosmic::Application for Window {
                     )
                 });
 
+        // Volume do proprio app (propriedade Volume do MPRIS), nao o do sistema.
+        let volume_pct = self.volume.unwrap_or(100);
+        let volume_icon = if self.volume.is_none() || volume_pct == 0 {
+            "audio-volume-muted-symbolic"
+        } else if volume_pct < 34 {
+            "audio-volume-low-symbolic"
+        } else if volume_pct < 67 {
+            "audio-volume-medium-symbolic"
+        } else {
+            "audio-volume-high-symbolic"
+        };
+        let volume_row = Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::alignment::Vertical::Center)
+            .push(icon::from_name(volume_icon).size(size.0))
+            .push(
+                slider(0..=100u32, volume_pct, Message::SetVolume)
+                .width(Length::Fixed(220.0)),
+            )
+            .push(
+                text(format!("{volume_pct}%"))
+                    .width(Length::Fixed(46.0))
+                    .align_x(cosmic::iced::alignment::Horizontal::Right),
+            );
+
         let content_list = Column::new()
             .padding(16)
             .spacing(12)
@@ -609,6 +644,7 @@ impl cosmic::Application for Window {
             .push(media_info)
             .push(progress_row)
             .push(controls)
+            .push(volume_row)
             .push(mode_controls);
 
         // Match COSMIC's own applets: the applet popup owns the themed card
@@ -636,6 +672,7 @@ impl Window {
         self.can_go_next = data.capabilities.next;
         self.can_shuffle = data.capabilities.shuffle;
         self.shuffle = data.shuffle;
+        self.volume = data.volume;
         self.can_loop = data.capabilities.loop_mode;
         self.loop_status = Some(data.loop_status);
         self.playback_state = data.state;

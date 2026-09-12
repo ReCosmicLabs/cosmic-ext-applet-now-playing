@@ -14,6 +14,9 @@ original work, as required by section 5 of the GPL.
   track loaded, even if paused; browsers (Chromium, Chrome, Firefox, Brave, Vivaldi) are only used when
   nothing else is available. Upstream follows MPRIS' "whoever is playing" rule, which made a WhatsApp tab
   take over the panel.
+- **App volume in the popup** (`src/window.rs`, `src/metadata.rs`, `src/player.rs`). A slider bound to the
+  player's own MPRIS `Volume` property, so Spotify's volume is set from the panel without touching the
+  system volume.
 - **Compact panel card** (`src/window.rs`). The panel shows the player's icon, a square cover, title and
   artist on two small lines (11 px / 9.5 px) and 14 px transport buttons, instead of one large text line.
 

@@ -30,6 +30,7 @@ pub struct NowPlayingData {
     pub position_seconds: Option<u64>,
     pub capabilities: PlaybackCapabilities,
     pub shuffle: bool,
+    pub volume: Option<u32>,
     pub loop_status: LoopStatus,
     pub state: PlaybackState,
     pub album_art_path: Option<PathBuf>,
@@ -51,6 +52,7 @@ impl NowPlayingData {
             && self.duration_seconds == other.duration_seconds
             && self.capabilities == other.capabilities
             && self.shuffle == other.shuffle
+            && self.volume == other.volume
             && self.loop_status == other.loop_status
             && self.state == other.state
             && self.album_art_path == other.album_art_path
@@ -81,6 +83,7 @@ pub fn now_playing_snapshot(include_position: bool) -> NowPlayingData {
         duration_seconds: None,
         position_seconds: None,
         shuffle: false,
+        volume: None,
         loop_status: LoopStatus::None,
         capabilities: PlaybackCapabilities {
             seek: false,
@@ -140,6 +143,10 @@ pub fn now_playing_from_player_with_sources(
                 loop_mode: player.can_loop().unwrap_or(false),
             },
             shuffle: player.get_shuffle().unwrap_or(false),
+            volume: player
+                .get_volume()
+                .ok()
+                .map(|v| (v * 100.0).round().clamp(0.0, 100.0) as u32),
             loop_status: player.get_loop_status().unwrap_or(LoopStatus::None),
             state: playback_state,
             album_art_path,
@@ -165,6 +172,7 @@ pub fn now_playing_from_player_with_sources(
             loop_mode: false,
         },
         shuffle: false,
+        volume: None,
         loop_status: LoopStatus::None,
         state: playback_state,
         album_art_path: None,
