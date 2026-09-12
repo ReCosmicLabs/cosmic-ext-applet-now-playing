@@ -292,22 +292,39 @@ impl cosmic::Application for Window {
         .height(Length::Fixed(PANEL_PLAYER_ICON as f32))
         .align_x(cosmic::iced::alignment::Horizontal::Center)
         .align_y(cosmic::iced::alignment::Vertical::Center);
+        // Album covers stay square; a video thumbnail keeps its wide shape, smaller, like
+        // a miniature, and the text column shrinks so the card does not grow with it.
+        const PANEL_THUMB_HEIGHT: f32 = 22.0;
+        const PANEL_THUMB_MAX_WIDTH: f32 = 40.0;
+        let is_wide = self
+            .album_art_dimensions
+            .is_some_and(|(w, h)| h != 0 && w as f32 / h as f32 > 1.2);
+        let (art_w, art_h) = if is_wide {
+            let (w, h) = self.album_art_dimensions.unwrap_or((16, 9));
+            (
+                (PANEL_THUMB_HEIGHT * w as f32 / h as f32).clamp(1.0, PANEL_THUMB_MAX_WIDTH),
+                PANEL_THUMB_HEIGHT,
+            )
+        } else {
+            (PANEL_ART_SIZE, PANEL_ART_SIZE)
+        };
+        let text_width = if is_wide { PANEL_TEXT_WIDTH - 30.0 } else { PANEL_TEXT_WIDTH };
         let panel_art: Element<'_, Message> = if let Some(path) = self.album_art_path.as_ref() {
             container(
                 image(image::Handle::from_path(path.clone()))
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .content_fit(ContentFit::Cover)
-                    .border_radius(5.0),
+                    .content_fit(ContentFit::Contain)
+                    .border_radius(4.0),
             )
-            .width(Length::Fixed(PANEL_ART_SIZE))
-            .height(Length::Fixed(PANEL_ART_SIZE))
+            .width(Length::Fixed(art_w))
+            .height(Length::Fixed(art_h))
             .clip(true)
             .into()
         } else {
             Space::new()
-                .width(Length::Fixed(PANEL_ART_SIZE))
-                .height(Length::Fixed(PANEL_ART_SIZE))
+                .width(Length::Fixed(art_w))
+                .height(Length::Fixed(art_h))
                 .into()
         };
         let artist_line = if self.now_playing_artist.is_empty() {
@@ -317,18 +334,18 @@ impl cosmic::Application for Window {
         };
         let lines = Column::new()
             .spacing(0)
-            .width(Length::Fixed(PANEL_TEXT_WIDTH))
+            .width(Length::Fixed(text_width))
             .push(
                 text(self.now_playing_title.as_str())
                     .size(PANEL_TITLE_SIZE)
-                    .width(Length::Fixed(PANEL_TEXT_WIDTH))
+                    .width(Length::Fixed(text_width))
                     .wrapping(Wrapping::None)
                     .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1))),
             )
             .push(
                 text(artist_line)
                     .size(PANEL_ARTIST_SIZE)
-                    .width(Length::Fixed(PANEL_TEXT_WIDTH))
+                    .width(Length::Fixed(text_width))
                     .wrapping(Wrapping::None)
                     .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
                     .class(cosmic::theme::Text::Default),
